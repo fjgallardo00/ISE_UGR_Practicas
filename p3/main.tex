@@ -35,7 +35,7 @@
 
 \section{Instalación de máquinas virtuales}
 
-Para la realización de esta práctica, debemos de hacer una instalación de dos máquinas virtuales, una que haga de servidor y una de cliente. Para la máquina servidor se usará Ubuntu 20.04 y para el cliente Rocky Linux 9.0. Para cada máquina debemos tener un sistema de archivos RAID1 instalado, por lo que debemos tener la siguiente configuración en Ubuntu como se ve en la figura \ref{fig:lsblk-ubuntu}.\\
+Para la realización de esta práctica, debemos de hacer una instalación de dos máquinas virtuales, una que haga de servidor y una de cliente. Para la máquina servidor se usará Ubuntu 20.04 y para el cliente Rocky Linux 9.0. Para cada máquina debemos tener un sistema de archivos RAID1 instalado, por lo que debemos tener la siguiente configuración en Ubuntu como se ve en la figura \ref{fig:lsblk-ubuntu}.
 
 \begin{figure}[H]
   \centering
@@ -219,7 +219,7 @@ Si bien con todo esto ya podríamos usar el servidor de Zabbix para monitorizar 
   \label{fig:adaptador}
 \end{figure}
 
-Tras esto, ejecutamos 'ip addr' para comprobar su ip, pero vemos que no aparece nada. Debemos de asociarle una ip y activar la interfaz con los siguientes comandos:
+Tras esto, ejecutamos 'ip addr' para comprobar su dirección IP, pero vemos que no aparece nada. Debemos de asociarle una IP y activar la interfaz con los siguientes comandos:
 
 \begin{lstlisting}
 > sudo ip addr add 192.168.56.115/24 dev enp0s8
@@ -247,4 +247,316 @@ Realizado todo el proceso de la IP, ya podemos proceder a instalar y configurar 
   \label{fig:conf-frontend}
 \end{figure}
 
-Por úlitmo, nos pedirá que iniciemos sesión y usaremos el usuario por defecto \textit{Admin} y la contraseña \textit{zabbix}. Iniciando sesión, ya tendremos listo nuestro servidor para monitorizar.
+Por úlitmo, nos pedirá que iniciemos sesión y usaremos el usuario por defecto \textit{Admin} y la contraseña \textit{zabbix}. Iniciando sesión, ya tendremos listo nuestro servidor para monitorizar.\\
+
+Cabe destacar que para que Ubuntu se monitorice a sí mismo debe de usar el agente de Zabbix e indicar en su configuración la dirección IP del servidor para que funcione correctamente, si no, en la página del navegador de Zabbix mostrará un fallo cuando se trate de monitorizar Ubuntu.
+
+\newpage
+\subsection{Instalación del agente en Rocky Linux 9}
+
+Para la instalación del agente en Rocky he seguido este manual 
+\url{https://www.zabbix.com/download?zabbix=5.0&os_distribution=rocky_linux&os_version=9&components=agent&db=&ws=}.
+
+Usamos los siguientes comandos para obtener el repositorio:
+
+\begin{lstlisting}
+# rpm -Uvh https://repo.zabbix.com/zabbix/5.0/rhel/
+8/x86_64/zabbix-release-5.0-1.el8.noarch.rpm
+# dnf clean all 
+\end{lstlisting}
+
+Habiendo añadido el repositorio, procedemos a instalar el agente de Rocky:
+
+\begin{lstlisting}
+# sudo dnf install zabbix-agent
+\end{lstlisting}
+
+Tras esto iniciamos el servicio de Zabbix:
+
+\begin{lstlisting}
+# systemctl restart zabbix-agent
+# systemctl enable zabbix-agent
+\end{lstlisting}
+
+Para configurar el agente de Zabbix, debemos de activar el adaptador solo-anfitrión de la máquina de Rocky y asignarle una dirección IP como hicimos anteriormente con Ubuntu \ref{fig:adaptador}. Para Rocky le asignamos la IP \textit{192.168.56.110/24}. 
+
+Tras esto, procedemos a configurarlo en su archivo \textit{/etc/zabbix/zabbix\_agentd.conf} para añadir la IP del servidor y la IP donde tiene que escuchar el agente (la IP de la propia máquina de Rocky)\ref{fig:agent}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.7]{Captura13}
+  \caption{Configuración de Zabbix-agent en Rocky}
+  \label{fig:agent}
+\end{figure}
+
+Como indica la figura, la IP que aparece primero es la del servidor de Zabbix en Ubuntu y en la última línera de la captura aparece la IP de Rocky. Es importante que la máquina tenga una IP asociada, pues si no, la configuración del agente fallará y el servicio de Zabbix-agent no se iniciará.\\
+
+El cortafuegos de Rocky es una parte importante de la configuración, pues debemos de añadir una regla para que permita el tráfico de paquetes en el puerto 10050. Para ellos ejecutamos los siguientes comandos:
+
+\begin{lstlisting}
+# sudo firewall-cmd --add-port=10050/tcp --permanent
+# sudo firewall-cmd --reload
+\end{lstlisting}
+
+De esta forma añadimos de forma permanente la regla y hacemos que el cortafuegos permita el tráfico por el puerto 10050. 
+
+\newpage
+\subsection{Monitorización de las máquinas}
+
+Ahora pasaremos al navegador y entramos en la Dashboard de Zabbix para empezar a monitorizar las dos máquinas virtuales.\\
+
+Lo primero que debemos hacer es crear los hosts para que Zabbix pueda monitorizar las máquinas. Nos vamos al apartado de \textit{Configuration > Hosts} y le damos al botón de \textit{Create host}. Rellenamos los datos necesarios, indicando la IP a la que se tiene que conectar \ref{fig:host-config}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.7]{Captura14}
+  \caption{Configuración de los hosts en Zabbix}
+  \label{fig:host-config}
+\end{figure}
+
+Hacemos lo mismo para Rocky, de tal forma que tendremos los dos hosts creados más el host por defecto \ref{fig:host-creados}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura15}
+  \caption{Hosts creados}
+  \label{fig:host-creados}
+\end{figure}
+
+Para cada host, clicamos en el apartado de items para indicar qué datos tiene que analizar Zabbix de las máquinas y le damos al botón de \textit{Create item}. Para Ubuntu y para Rocky realizamos el mismo paso \ref{fig:items-creados}:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.9]{Captura16}
+  \caption{Items de monitorización creados}
+  \label{fig:items-creados}
+\end{figure}
+
+Esta opción es para crear un item personal con parámetros que nosotros queramos especificar (en este caso sobre SSH), pero existen templates que vienen por defecto para monitorizar ciertos aspectos de las máquinas. En nuestro caso, tenemos que monitorizar los servicios SSH, HTTP y el uso de la CPU, la memoria, etcétera, pero podemos añadir más servicios para monitorizar. Usaremos los templates por defecto para poder ver HTTP y otros servicios(entre ellos la monitorización de los discos) \ref{fig:templates}:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.6]{Captura17}
+  \caption{Templates de monitorización}
+  \label{fig:templates}
+\end{figure}
+
+Añadiendo estos templates tanto en Ubuntu como en Rocky ya podemos ver cuando los servicios están funcionando o no. Podemos probar a parar el servidor de SSH de Ubuntu y volverlo a encender para comprobar que en Zabbix podemos ver cuando está activo y cuando no en \textit{Monitoring > Latest data} \ref{fig:monit-servicios}:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.4]{Captura18}
+  \caption{Monitorización de los servicios}
+  \label{fig:monit-servicios}
+\end{figure}
+
+En este ejemplo podemos ver que el servicio de SSH que hemos parado voluntariamente durante un periodo corto de tiempo para luego ponerlo a funcionar lo ha captado Zabbix.
+
+\newpage
+
+\section{Ansible}
+
+\subsection{Instalación}
+Para la instalación de Ansible, he instalado otra máquina virtual con Rocky Linux. He seguido esta documentación \url{https://docs.rockylinux.org/books/learning_ansible/01-basic/}. Aquí nos pone dos maneras de instalar Ansible, usando EPEL o usando Python. En mi caso lo instalaré a través de EPEL. Para ello usaré estos comandos:
+
+\begin{lstlisting}
+# sudo dnf install epel-release
+\end{lstlisting}
+
+\begin{lstlisting}
+# sudo dnf install ansible
+\end{lstlisting}
+
+Una vez hecho esto podemos comprobar la versión de Ansible para comprobar cuál tenemos \ref{fig:ansible-version}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura19}
+  \caption{Versión de Ansible}
+  \label{fig:ansible-version}
+\end{figure}
+
+Por el funcionamiento de Ansible, debemos de tener instalado OpenSSH para poder ejecutar comandos ya que manda las peticiones a través SSH. 
+
+\newpage
+\subsection{Configuración y uso}
+
+Para que ansible se ejecute, debemos de especificar en el archivo "hosts" de la ruta "/etc/ansible/" todas las IPs donde queremos ejecutar Ansible. Puesto que nosotros solamente queremos ejecutar un par de comandos en nuestro servidor de Ubuntu y de Rocky (donde tenemos el zabbix-agent), añadimos las IPs de las dos máquinas a nuestra máquina cliente. También podemos añadir el nombre de dominio donde queramos ejecutar los comandos. Solamente debemos de añadir la url. Puesto que este no es nuestro caso, solo nos basta con poner la IP. Si en el momento en el que instalamos openssh en nuestro servidor cambiamos el puerto de acceso, debemos de indicar en la IP el puerto también \ref{fig:ansible-hosts}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics{Captura20}
+  \caption{Hosts de Ansible}
+  \label{fig:ansible-hosts}
+\end{figure}
+
+Ya podemos probar a ejecutar el siguiente comando:
+
+\begin{lstlisting}
+# ansible zabbix-mv -m ping
+\end{lstlisting}
+
+Tras ejecutarlo obtenemos el siguiente resultado \ref{fig:ansible-prueba}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura21}
+  \caption{Resultado del comando de Ansible}
+  \label{fig:ansible-prueba}
+\end{figure}
+
+Puede ser que falle el comando, pues nos pide autenticación, como nos indica la documentación. Una de las soluciones es usar claves rsa e intercambiarlas para no tener que autenticarnos por contraseña. Para ello hacemos uso de estos comandos: 
+
+\begin{lstlisting}
+# ssh-keygen -t rsa -b 4096
+\end{lstlisting}
+
+\begin{lstlisting}
+# ssh-copy-id 192.168.56.115
+\end{lstlisting}
+
+Cabe destacar que en Rocky no funcionará de primeras, por lo que primero debemos de permitir en el cortafuegos que pasen los paquetes en el puerto que tengamos en SSH, por lo que para que funcione también en Rocky, debemos usar estos comandos:
+
+\begin{lstlisting}
+# sudo firewall-cmd --add-port=22/tcp --permanent
+\end{lstlisting}
+
+\begin{lstlisting}
+# sudo firewall-cmd --reload
+\end{lstlisting}
+
+\begin{lstlisting}
+# ssh-copy-id 192.168.56.110
+\end{lstlisting}
+
+Tras hacer esto, ya sí debería funcionar todo. Haciendo de nuevo la prueba de Ansible tenemos el siguiente resultado \ref{fig:ansible-prueba-2}:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura22}
+  \caption{Resultado del comando de Ansible}
+  \label{fig:ansible-prueba-2}
+\end{figure}
+
+En la imagen se puede ver que ya funciona de forma correcta hacer un ping a las máquinas, así que ahora ya se puede probar realizar un comando básico como por ejemplo el script de monitorización del sistema de RAID1. Para ello usamos el siguiente comando: 
+
+\begin{lstlisting}
+# ansible zabbix-mv -m shell -a "cat /proc/mdstat"
+\end{lstlisting}
+
+Usando este comando en mi máquina de Rocky obtengo el siguiente resultado \ref{fig:ansible-mdstat}:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura23}
+  \caption{Resultado del comando de Ansible}
+  \label{fig:ansible-mdstat}
+\end{figure}
+
+Vemos que el comando se ejecuta correctamente y nos muestra el resultado del script, que de hecho, ejecutando este comando me di cuenta de que uno de los dos discos del RAID1 de la máquina de Ubuntu no funciona. Haciendo una retrospectiva a todo lo realizado, ese disco seguramente dejó de funcionar en el momento en el que saltó este error \ref{fig:error}. Para arreglar este problema hay que añadir otro disco a la máquina y añadirlo al RAID1 usando el comando de mdadm.
+
+\newpage
+\subsection{Uso de playbooks}
+
+Si bien lo mostrado anteriormente funciona, también podemos usar playbooks para realizar la ejecución como si fuera un script y realizar acciones más complejas. Debemos de crear un archivo "playbook.yml". En él debemos de escribir las instrucciones que queremos que realice \ref{fig:ansible-playbook}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura24}
+  \caption{Playbook de Ansible}
+  \label{fig:ansible-playbook}
+\end{figure}
+
+En este playbook he indicado que en el grupo de hosts las IPs de cada máquina se ejecute como root y compruebe si los demonios del servidor apache están en funcionamiento y si su versión es la última. Cuando tengamos el playbook listo, debemos ejecutarlo de la siguente forma:
+
+\begin{lstlisting}
+# ansible-playbook playbook.yml
+\end{lstlisting}
+
+Tras ejecutarlo vemos el resultado \ref{fig:ansible-playbook-res}: 
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.8]{Captura25}
+  \caption{Resultado del playbook}
+  \label{fig:ansible-playbook-res}
+\end{figure}
+
+
+En la imagen podemos comprobar que no tenemos permisos para ejecutar como root, por lo que debemos de darle permisos a Ansible como indica la documentación.\\
+
+Primero de todo nos logueamos como superusuario con el comando de \textit{sudo su} para poder modificar el archivo de \textit{/etc/ansible/ansible.cfg} y cambiar el campo de \textit{aks\_pass} a True en nuestra máquina donde ejecutamos Ansible. A continuación debemos de realizar en la máquina de Rocky con el zabbix-agent los siguientes comandos:
+
+\begin{lstlisting}
+# sudo useradd ansible
+\end{lstlisting}
+
+\begin{lstlisting}
+# sudo usermod -aG wheel ansible
+\end{lstlisting}
+
+Con esto añadimos el usuario de Ansible a la rueda de wheel de permisos de root. A continuación añadimos contraseña al usuario:
+
+\begin{lstlisting}
+# sudo passwd ansible
+\end{lstlisting}
+
+Después de esto, en el archivo de \textit{visudo} cambiamos que todos los usuarios de wheel puedan ejecutar todos los comandos sin que nos pida contraseña con este comando:
+
+\begin{lstlisting}
+# sudo visudo
+\end{lstlisting}
+
+Debemos modificar los campos y que se queden como se indica aquí abajo:
+
+\begin{lstlisting}
+## Allows people in group wheel to run all commands
+# %wheel  ALL=(ALL)       ALL
+
+## Same thing without a password
+%wheel        ALL=(ALL)       NOPASSWD: ALL
+\end{lstlisting}
+
+Con esto ya podemos ejecutar el playbook  con Rocky solamente. Si lo hacemos de nuevo, obtenemos lo siguiente \ref{fig:ansible-playbook-wheel}:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.6]{Captura26}
+  \caption{Playbook de Ansible}
+  \label{fig:ansible-playbook-wheel}
+\end{figure}
+
+Con esta ejecución podemos ver que el playbook se puede ejecutar en Rocky, pero no en Ubuntu, y que además se comprueba que el servicio de httpd está activo y está en su última versión. Ahora debemos de darle permisos a Ubuntu para que realice la misma tarea. Para ello, creamos el usuario de Ansible en Ubuntu y lo añadimos al grupo de sudoers:
+
+\begin{lstlisting}
+# sudo useradd ansible
+\end{lstlisting}
+
+\begin{lstlisting}
+# sudo usermod -aG sudo ansible
+\end{lstlisting}
+
+\begin{lstlisting}
+# sudo passwd ansible
+\end{lstlisting}
+
+Y en el archivo de sudoers de Ubuntu escribimos lo siguiente:
+
+\begin{lstlisting}
+%sudo        ALL=(ALL:ALL)       NOPASSWD: ALL
+\end{lstlisting}
+
+Con esto ya somos capaces de ejecutar el playbook en Ubuntu también \ref{fig:ansible-playbook-sudo}: 
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[scale=0.6]{Captura27}
+  \caption{Playbook de Ansible}
+  \label{fig:ansible-playbook-sudo}
+\end{figure}
+
+Como se puede ver en la imagen, el playbook ha funcionado a la perfección y se ha podido comprobar que los servicios de apache2 en Ubuntu y httpd en Rocky están actualizados y en funcionamiento.\\
+
+Hay que tener en cuenta que estamos quitando formas de autenticado con la contraseña para los usuarios del grupo de wheel en Rocky y de sudo en Ubuntu, y podría ser un problema, pero si las máquinas forman parte de un grupo  de servidores que se gestionan por si solos y nadie debe de acceder a ellas, no debería haber problema con esta modificación.
+
+\end{document}
